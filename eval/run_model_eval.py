@@ -7,13 +7,19 @@ import json
 import math
 import random
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from eval.decision import generate_decisions
 from eval.prompt_templates import PROMPT_VERSION, build_prompt
+from eval.schemas import (
+    AST_INTERPRETATION_SCHEMA,
+    BLOOD_CULTURE_ASSESSMENT_SCHEMA,
+    STRUCTURED_REPORT_DRAFT_SCHEMA,
+)
 from eval.scoring import summarize_results
+from eval.validators import repair_json, validate_citations, validate_json
 
 try:
     import torch
@@ -25,6 +31,11 @@ except Exception:  # handled gracefully at runtime
 
 
 TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9_]+")
+STRUCTURED_TASK_SCHEMAS = {
+    "ast": AST_INTERPRETATION_SCHEMA,
+    "blood_culture": BLOOD_CULTURE_ASSESSMENT_SCHEMA,
+    "reporting": STRUCTURED_REPORT_DRAFT_SCHEMA,
+}
 
 
 class BM25Retriever:
@@ -184,6 +195,7 @@ def main() -> None:
     gold = load_jsonl(args.gold)
     chunks = load_jsonl(args.chunks)
     retriever = BM25Retriever(chunks)
+    system_prompt_text = Path("eval/system_prompt.txt").read_text(encoding="utf-8").strip()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)
@@ -209,6 +221,8 @@ def main() -> None:
                         "retrieved_chunk_ids": [],
                         "output": "",
                         "output_repeat": "",
+                        "validation": {"ok": False, "error": "transformers_or_torch_unavailable"},
+                        "citation_metrics": validate_citations("", []),
                         "error": "transformers_or_torch_unavailable",
                     }
                 )
@@ -233,6 +247,8 @@ def main() -> None:
                         "retrieved_chunk_ids": [],
                         "output": "",
                         "output_repeat": "",
+                        "validation": {"ok": False, "error": f"load_failure: {exc}"},
+                        "citation_metrics": validate_citations("", []),
                         "error": f"load_failure: {exc}",
                     }
                 )
@@ -242,6 +258,7 @@ def main() -> None:
             retrieved = retriever.retrieve(item.get("question", ""), top_k=args.top_k)
             evidence_text, chunk_ids = format_evidence(retrieved)
             prompt = build_prompt(item.get("task", ""), item.get("question", ""), evidence_text)
+            prompt["system"] = f"{system_prompt_text}\n\n{prompt['system']}"
 
             try:
                 output = generate(model, tokenizer, prompt, max_new_tokens=args.max_new_tokens)
@@ -252,6 +269,36 @@ def main() -> None:
                 output_repeat = ""
                 error = f"generation_failure: {exc}"
 
+            task = (item.get("task") or "").strip().lower()
+            schema = STRUCTURED_TASK_SCHEMAS.get(task)
+            validation: Dict[str, Any]
+            normalized_output = output
+
+            if schema and not error:
+                ok, obj_or_error = validate_json(schema, output)
+                if ok:
+                    validation = {"ok": True, "repaired": False, "error": None}
+                    normalized_output = json.dumps(obj_or_error, ensure_ascii=False)
+                else:
+                    repair_obj = repair_json(
+                        schema,
+                        output,
+                        lambda repair_user_prompt: generate(
+                            model,
+                            tokenizer,
+                            {"system": prompt["system"], "user": repair_user_prompt},
+                            max_new_tokens=args.max_new_tokens,
+                        ),
+                    )
+                    validation = {"ok": "safe_failure" not in repair_obj, "repaired": True, "error": None if "safe_failure" not in repair_obj else repair_obj.get("error")}
+                    normalized_output = json.dumps(repair_obj, ensure_ascii=False)
+            elif schema and error:
+                validation = {"ok": False, "repaired": False, "error": error}
+            else:
+                validation = {"ok": True, "repaired": False, "error": None}
+
+            citation_metrics = validate_citations(normalized_output, chunk_ids)
+
             results.append(
                 {
                     "model_id": model_id,
@@ -261,8 +308,10 @@ def main() -> None:
                     "must_refuse": bool(item.get("must_refuse", False)),
                     "prompt_version": PROMPT_VERSION,
                     "retrieved_chunk_ids": chunk_ids,
-                    "output": output,
+                    "output": normalized_output,
                     "output_repeat": output_repeat,
+                    "validation": validation,
+                    "citation_metrics": citation_metrics,
                     "error": error,
                 }
             )
