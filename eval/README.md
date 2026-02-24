@@ -5,16 +5,33 @@ This folder provides a repeatable CLI benchmark for comparing BioMistral (defaul
 ## Inputs
 
 - `eval/models.yaml`: model shortlist (`provider: hf`, `type: causal_lm`), BioMistral set as `default: true`.
-- `eval/gold.jsonl`: evaluation items across tasks (`ast`, `blood_culture`, `rapid_dx`, etc.).
-- `rag/rag_chunks.jsonl`: retrieval corpus chunks (JSONL with `text` and optional `chunk_id`).
+- `eval/gold.jsonl`: evaluation items across tasks (`organism_id`, `ast`, `blood_culture`, `rapid_dx`, `reporting`, `stewardship`).
+- `rag/rag_chunks.jsonl`: retrieval corpus chunks (JSONL with `text`, `chunk_id`, and optional metadata including `weak_label`).
 - `eval/system_prompt.txt`: global safety and evidence-only rules prepended to every request.
 
-## Run
+## Generate auto benchmark (silver/gold-v0)
+
+```bash
+python -m eval.generate_gold --chunks rag/rag_chunks.jsonl --out eval/gold.jsonl --n_total 200 --seed 42
+```
+
+This creates:
+- `eval/gold.jsonl`
+- `eval/gold_manifest.json`
+
+`silver/gold-v0` is an **auto-generated benchmark** focused on structure/safety/grounding checks (schema validity, citation correctness, refusal/escalation behavior, consistency). It is **not** a full clinician-authored clinical correctness benchmark.
+
+## Validate generated benchmark
+
+```bash
+python -m eval.validate_gold --gold eval/gold.jsonl
+```
+
+## Run model evaluation
 
 ```bash
 python -m eval.run_model_eval \
   --models eval/models.yaml \
-  --gold eval/gold.jsonl \
   --chunks rag/rag_chunks.jsonl \
   --top_k 6 \
   --out eval/results.jsonl
@@ -22,6 +39,7 @@ python -m eval.run_model_eval \
 
 Optional flags:
 
+- `--gold eval/gold.jsonl` (default is already `eval/gold.jsonl`).
 - `--model_id <hf_model_id>` to run a specific model.
 - `--seed 7` for deterministic runs.
 - `--max_new_tokens 320` to cap completion length.

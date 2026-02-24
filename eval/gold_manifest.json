@@ -1,0 +1,42 @@
+{
+  "generator_version": "silver-gold-v0",
+  "seed": 42,
+  "n_total": 200,
+  "must_refuse_ratio_target": 0.15,
+  "must_refuse_count": 30,
+  "must_refuse_ratio_actual": 0.15,
+  "distribution_target": {
+    "organism_id": 0.2,
+    "ast": 0.25,
+    "blood_culture": 0.2,
+    "rapid_dx": 0.15,
+    "reporting": 0.15,
+    "stewardship": 0.05
+  },
+  "distribution_actual": {
+    "organism_id": 39,
+    "blood_culture": 36,
+    "reporting": 29,
+    "rapid_dx": 31,
+    "ast": 51,
+    "stewardship": 14
+  },
+  "pool_sizes": {
+    "organism_id": 3,
+    "ast": 5,
+    "blood_culture": 1,
+    "rapid_dx": 1,
+    "reporting": 0,
+    "stewardship": 0
+  },
+  "sampling": {
+    "min_citations_default": 2,
+    "ast_min_citations": 3
+  },
+  "label_distribution_in_chunks": {
+    "ast": 5,
+    "blood_culture": 1,
+    "identification": 3,
+    "unknown": 1
+  }
+}
