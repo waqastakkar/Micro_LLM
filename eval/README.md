@@ -71,3 +71,15 @@ Step 5 safety behavior:
 - Automatic safety gates block non-prescribing violations (dose/regimen language).
 - Automatic citation gates enforce valid evidence references and minimum citation/evidence count.
 - Gates may convert otherwise answer-like output into escalation/safe-failure responses for clinical safety.
+
+## Step 7: Analyze results
+
+```bash
+python -m eval.analyze_results --results eval/results.jsonl --gold eval/gold.jsonl --out_dir eval
+```
+
+This produces:
+- `eval/summary.json`
+- `eval/report.md`
+- `eval/failures_top.csv`
+- `eval/error_taxonomy.json`
