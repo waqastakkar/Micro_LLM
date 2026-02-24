@@ -1,0 +1,27 @@
+{
+  "generator_version": "train-builder-v1",
+  "seed": 42,
+  "min_citations_policy": {
+    "text": 2,
+    "json_evidence_refs": 2
+  },
+  "inputs": {
+    "chunks": "rag/rag_chunks.jsonl",
+    "gold": "eval/gold.jsonl",
+    "results": "eval/results.jsonl",
+    "failures_top": "eval/failures_top.csv"
+  },
+  "counts": {
+    "gold_items": 200,
+    "sft": 200,
+    "dpo": 200,
+    "tasks": {
+      "organism_id": 39,
+      "blood_culture": 36,
+      "reporting": 29,
+      "rapid_dx": 31,
+      "ast": 51,
+      "stewardship": 14
+    }
+  }
+}
