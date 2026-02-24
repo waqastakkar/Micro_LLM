@@ -30,10 +30,12 @@ from eval.validators import (
 try:
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
+    from peft import PeftModel
 except Exception:  # handled gracefully at runtime
     torch = None
     AutoModelForCausalLM = None
     AutoTokenizer = None
+    PeftModel = None
 
 TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9_]+")
 
@@ -209,6 +211,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--summary_out", type=Path, default=Path("eval/summary.json"))
     parser.add_argument("--model_id", type=str, default=None)
+    parser.add_argument("--lora_path", type=Path, default=None)
     parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
@@ -263,6 +266,10 @@ def main() -> None:
 
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", low_cpu_mem_usage=True)
+        if args.lora_path is not None:
+            if PeftModel is None:
+                raise RuntimeError("peft is required when --lora_path is provided")
+            model = PeftModel.from_pretrained(model, str(args.lora_path))
         model.eval()
 
         for item in gold:
