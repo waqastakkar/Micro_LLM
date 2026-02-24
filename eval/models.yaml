@@ -1,0 +1,28 @@
+models:
+  - id: BioMistral/BioMistral-7B
+    provider: hf
+    type: causal_lm
+    context_length: 8192
+    default: true
+    notes: Primary shortlist model for biomedical RAG evaluation.
+
+  - id: mistralai/Mistral-7B-Instruct-v0.3
+    provider: hf
+    type: causal_lm
+    context_length: 8192
+    default: false
+    notes: General-domain comparator with similar parameter count.
+
+  - id: meta-llama/Llama-3.1-8B-Instruct
+    provider: hf
+    type: causal_lm
+    context_length: 8192
+    default: false
+    notes: 8B instruct comparator (license-gated on Hugging Face).
+
+  - id: Qwen/Qwen2.5-7B-Instruct
+    provider: hf
+    type: causal_lm
+    context_length: 32768
+    default: false
+    notes: Strong instruction-following comparator.
