@@ -37,6 +37,9 @@ python -m eval.run_model_eval \
   --out eval/results.jsonl
 ```
 
+
+You can compare base vs LoRA adapters by running once without `--lora_path` and once with `--lora_path <adapter_dir>`.
+
 Optional flags:
 
 - `--gold eval/gold.jsonl` (default is already `eval/gold.jsonl`).
