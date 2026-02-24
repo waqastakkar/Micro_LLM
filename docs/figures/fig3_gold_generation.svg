@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="white"/>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#111"/>
+    </marker>
+    <style>
+      .t{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:700;fill:#111;font-size:22px}
+      .title{font-size:34px}
+      .b{fill:#f7f7f7;stroke:#111;stroke-width:2}
+      .a{fill:#eceff7;stroke:#111;stroke-width:2}
+      .line{stroke:#111;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <text x="40" y="60" class="t title">FIGURE 3 — AUTOMATED GOLD GENERATION</text>
+
+  <rect class="b" x="90" y="360" rx="18" ry="18" width="250" height="110"/>
+  <text class="t" x="215" y="420" text-anchor="middle">INPUT:</text>
+  <text class="t" x="215" y="448" text-anchor="middle">rag_chunks.jsonl</text>
+
+  <rect class="a" x="390" y="300" rx="18" ry="18" width="320" height="120"/>
+  <text class="t" x="550" y="355" text-anchor="middle">STRATIFIED SAMPLING</text>
+  <text class="t" x="550" y="385" text-anchor="middle">WEAK_LABEL / TASK MIX</text>
+
+  <rect class="a" x="390" y="500" rx="18" ry="18" width="320" height="120"/>
+  <text class="t" x="550" y="555" text-anchor="middle">MUST-REFUSE</text>
+  <text class="t" x="550" y="585" text-anchor="middle">INJECTION (15%)</text>
+
+  <rect class="a" x="780" y="360" rx="18" ry="18" width="350" height="110"/>
+  <text class="t" x="955" y="420" text-anchor="middle">TEMPLATE-BASED</text>
+  <text class="t" x="955" y="448" text-anchor="middle">QUESTION GENERATION</text>
+
+  <rect class="b" x="1200" y="320" rx="18" ry="18" width="320" height="140"/>
+  <text class="t" x="1360" y="380" text-anchor="middle">OUTPUT:</text>
+  <text class="t" x="1360" y="410" text-anchor="middle">eval/gold.jsonl</text>
+
+  <rect class="b" x="1200" y="510" rx="18" ry="18" width="320" height="110"/>
+  <text class="t" x="1360" y="570" text-anchor="middle">MANIFEST METADATA</text>
+
+  <path class="line" d="M340 415 L390 360"/>
+  <path class="line" d="M340 415 L390 560"/>
+  <path class="line" d="M710 360 L780 415"/>
+  <path class="line" d="M710 560 L780 415"/>
+  <path class="line" d="M1130 415 L1200 390"/>
+  <path class="line" d="M1130 430 L1200 560"/>
+</svg>

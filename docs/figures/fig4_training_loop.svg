@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="white"/>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#111"/>
+    </marker>
+    <style>
+      .t{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:700;fill:#111;font-size:22px}
+      .title{font-size:34px}
+      .b{fill:#f7f7f7;stroke:#111;stroke-width:2}
+      .a{fill:#eceff7;stroke:#111;stroke-width:2}
+      .line{stroke:#111;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <text x="40" y="60" class="t title">FIGURE 4 — TRAINING / IMPROVEMENT LOOP</text>
+
+  <rect class="b" x="70" y="180" rx="18" ry="18" width="260" height="100"/>
+  <text class="t" x="200" y="240" text-anchor="middle">eval/gold.jsonl</text>
+
+  <rect class="b" x="70" y="340" rx="18" ry="18" width="260" height="100"/>
+  <text class="t" x="200" y="400" text-anchor="middle">eval/results.jsonl</text>
+
+  <rect class="a" x="400" y="260" rx="18" ry="18" width="260" height="120"/>
+  <text class="t" x="530" y="320" text-anchor="middle">ANALYSIS</text>
+  <text class="t" x="530" y="350" text-anchor="middle">(STEP 7)</text>
+
+  <rect class="b" x="730" y="260" rx="18" ry="18" width="270" height="120"/>
+  <text class="t" x="865" y="320" text-anchor="middle">failures_top.csv</text>
+
+  <rect class="a" x="1060" y="260" rx="18" ry="18" width="260" height="120"/>
+  <text class="t" x="1190" y="320" text-anchor="middle">BUILD SFT</text>
+  <text class="t" x="1190" y="350" text-anchor="middle">DATASETS</text>
+
+  <rect class="b" x="1060" y="470" rx="18" ry="18" width="260" height="120"/>
+  <text class="t" x="1190" y="530" text-anchor="middle">LORA ADAPTER</text>
+
+  <rect class="a" x="730" y="470" rx="18" ry="18" width="270" height="120"/>
+  <text class="t" x="865" y="530" text-anchor="middle">RE-EVAL</text>
+
+  <rect class="b" x="400" y="470" rx="18" ry="18" width="260" height="120"/>
+  <text class="t" x="530" y="530" text-anchor="middle">UPDATED</text>
+  <text class="t" x="530" y="560" text-anchor="middle">RESULTS</text>
+
+  <path class="line" d="M330 230 L400 300"/>
+  <path class="line" d="M330 390 L400 340"/>
+  <path class="line" d="M660 320 L730 320"/>
+  <path class="line" d="M1000 320 L1060 320"/>
+  <path class="line" d="M1190 380 L1190 470"/>
+  <path class="line" d="M1060 530 L1000 530"/>
+  <path class="line" d="M730 530 L660 530"/>
+  <path class="line" d="M530 470 L530 380"/>
+</svg>

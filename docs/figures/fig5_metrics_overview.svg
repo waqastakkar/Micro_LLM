@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="white"/>
+  <defs>
+    <style>
+      .t{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:700;fill:#111;font-size:22px}
+      .title{font-size:34px}
+      .axis{stroke:#111;stroke-width:3}
+      .base{fill:#d9d9d9;stroke:#111;stroke-width:2}
+      .lora{fill:#aab7d1;stroke:#111;stroke-width:2}
+    </style>
+  </defs>
+
+  <text x="40" y="60" class="t title">FIGURE 5 — METRICS OVERVIEW TEMPLATE (BASE VS +LORA)</text>
+  <line x1="180" y1="780" x2="1500" y2="780" class="axis"/>
+  <line x1="180" y1="160" x2="180" y2="780" class="axis"/>
+
+  <text class="t" x="146" y="780" text-anchor="end">0</text>
+  <text class="t" x="146" y="620" text-anchor="end">25</text>
+  <text class="t" x="146" y="460" text-anchor="end">50</text>
+  <text class="t" x="146" y="300" text-anchor="end">75</text>
+  <text class="t" x="146" y="170" text-anchor="end">100</text>
+
+  <rect class="base" x="260" y="420" width="70" height="360"/>
+  <rect class="lora" x="340" y="320" width="70" height="460"/>
+  <text class="t" x="335" y="830" text-anchor="middle">SCHEMA VALIDITY</text>
+
+  <rect class="base" x="560" y="470" width="70" height="310"/>
+  <rect class="lora" x="640" y="350" width="70" height="430"/>
+  <text class="t" x="635" y="830" text-anchor="middle">CITATION COMPLIANCE</text>
+
+  <rect class="base" x="860" y="520" width="70" height="260"/>
+  <rect class="lora" x="940" y="380" width="70" height="400"/>
+  <text class="t" x="935" y="830" text-anchor="middle">MUST-REFUSE COMPLIANCE</text>
+
+  <rect class="base" x="1160" y="560" width="70" height="220"/>
+  <rect class="lora" x="1240" y="500" width="70" height="280"/>
+  <text class="t" x="1235" y="830" text-anchor="middle">SAFETY GATE RATE</text>
+
+  <rect x="1200" y="120" width="36" height="24" class="base"/>
+  <text class="t" x="1248" y="140">BASE</text>
+  <rect x="1330" y="120" width="36" height="24" class="lora"/>
+  <text class="t" x="1378" y="140">+LORA</text>
+</svg>

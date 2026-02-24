@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="white"/>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#111"/>
+    </marker>
+    <style>
+      .t{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:700;fill:#111;font-size:22px}
+      .title{font-size:34px}
+      .b{fill:#f6f6f6;stroke:#111;stroke-width:2}
+      .a{fill:#eceff7;stroke:#111;stroke-width:2}
+      .line{stroke:#111;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <text x="40" y="60" class="t title">FIGURE 2 — SAFETY / VALIDATION LAYER</text>
+
+  <rect class="b" x="70" y="360" rx="18" ry="18" width="220" height="110"/>
+  <text class="t" x="180" y="420" text-anchor="middle">RAW MODEL OUTPUT</text>
+
+  <rect class="a" x="340" y="360" rx="18" ry="18" width="240" height="110"/>
+  <text class="t" x="460" y="420" text-anchor="middle">JSON SCHEMA</text>
+  <text class="t" x="460" y="448" text-anchor="middle">VALIDATOR</text>
+
+  <rect class="a" x="630" y="360" rx="18" ry="18" width="210" height="110"/>
+  <text class="t" x="735" y="420" text-anchor="middle">CITATION GATE</text>
+
+  <rect class="a" x="890" y="360" rx="18" ry="18" width="270" height="110"/>
+  <text class="t" x="1025" y="420" text-anchor="middle">NON-PRESCRIBING FILTER</text>
+
+  <rect class="a" x="1210" y="360" rx="18" ry="18" width="250" height="110"/>
+  <text class="t" x="1335" y="420" text-anchor="middle">SAFE FAILURE</text>
+  <text class="t" x="1335" y="448" text-anchor="middle">OVERRIDE</text>
+
+  <rect class="b" x="1250" y="610" rx="18" ry="18" width="250" height="110"/>
+  <text class="t" x="1375" y="670" text-anchor="middle">FINAL RESPONSE</text>
+
+  <path class="line" d="M290 415 L340 415"/>
+  <path class="line" d="M580 415 L630 415"/>
+  <path class="line" d="M840 415 L890 415"/>
+  <path class="line" d="M1160 415 L1210 415"/>
+  <path class="line" d="M1335 470 L1375 610"/>
+
+  <rect class="b" x="320" y="620" rx="16" ry="16" width="760" height="180"/>
+  <text class="t" x="700" y="670" text-anchor="middle">METRICS LOGGED</text>
+  <text class="t" x="700" y="710" text-anchor="middle">schema_ok | invalid_citations</text>
+  <text class="t" x="700" y="750" text-anchor="middle">safety_gate_type | escalation_flag</text>
+</svg>
