@@ -8,13 +8,18 @@ python -m train.build_datasets \
   --gold eval/gold.jsonl \
   --results eval/results.jsonl \
   --out_dir train \
+  --failures eval/failures_top.csv \
+  --failures_oversample 3 \
+  --task_mix organism_id=0.20,ast=0.25,blood_culture=0.20,rapid_dx=0.15,reporting=0.15,stewardship=0.05 \
+  --must_refuse_ratio 0.15 \
   --seed 42 \
   --n_sft 5000 \
   --n_dpo 2000
 ```
 
 Outputs:
-- `train/sft.jsonl`
+- `train/sft.train.jsonl`
+- `train/sft.valid.jsonl`
 - `train/dpo.jsonl`
 - `train/manifest.json`
 
@@ -23,13 +28,16 @@ Outputs:
 ```bash
 python -m train.train_lora \
   --model_id BioMistral/BioMistral-7B \
-  --train_file train/sft.jsonl \
+  --train_file train/sft.train.jsonl \
+  --valid_file train/sft.valid.jsonl \
   --output_dir train/adapters/biomistral_sft_lora \
   --dtype fp16 \
   --batch_size 2 \
   --grad_accum 8 \
   --lr 2e-4 \
-  --epochs 1
+  --epochs 1 \
+  --max_seq_len 4096 \
+  --grad_ckpt true
 ```
 
 ## 3) Run eval with adapter

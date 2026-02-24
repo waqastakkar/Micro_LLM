@@ -63,17 +63,26 @@ def parse_dtype(dtype: str) -> torch.dtype:
     raise ValueError("dtype must be one of: fp16, bf16")
 
 
+def parse_bool(raw: str | bool) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    return raw.strip().lower() in {"1", "true", "yes", "y"}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train BioMistral LoRA adapter on SFT dataset.")
     parser.add_argument("--model_id", type=str, default="BioMistral/BioMistral-7B")
-    parser.add_argument("--train_file", type=Path, default=Path("train/sft.jsonl"))
+    parser.add_argument("--train_file", type=Path, default=Path("train/sft.train.jsonl"))
+    parser.add_argument("--valid_file", type=Path, default=Path("train/sft.valid.jsonl"))
     parser.add_argument("--output_dir", type=Path, required=True)
     parser.add_argument("--dtype", type=str, default="fp16")
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--grad_accum", type=int, default=8)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--epochs", type=float, default=1)
-    parser.add_argument("--max_length", type=int, default=2048)
+    parser.add_argument("--max_seq_len", type=int, default=4096)
+    parser.add_argument("--grad_ckpt", type=str, default="true")
+    parser.add_argument("--save_steps", type=int, default=200)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -100,11 +109,19 @@ def main() -> None:
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
     model = get_peft_model(model, lora_cfg)
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False}) if parse_bool(
+        args.grad_ckpt
+    ) else None
 
     rows = load_sft(args.train_file)
     if not rows:
         raise RuntimeError(f"No rows found in {args.train_file}")
-    train_ds = tokenize_rows(rows, tokenizer, args.max_length)
+    train_ds = tokenize_rows(rows, tokenizer, args.max_seq_len)
+    valid_ds = None
+    if args.valid_file.exists():
+        valid_rows = load_sft(args.valid_file)
+        if valid_rows:
+            valid_ds = tokenize_rows(valid_rows, tokenizer, args.max_seq_len)
 
     train_args = TrainingArguments(
         output_dir=str(args.output_dir),
@@ -115,13 +132,18 @@ def main() -> None:
         fp16=args.dtype.lower() == "fp16",
         bf16=args.dtype.lower() == "bf16",
         logging_steps=10,
-        save_strategy="epoch",
+        save_strategy="steps",
+        save_steps=args.save_steps,
+        evaluation_strategy="steps" if valid_ds is not None else "no",
+        eval_steps=args.save_steps if valid_ds is not None else None,
         report_to=[],
         remove_unused_columns=False,
         seed=args.seed,
+        gradient_checkpointing=parse_bool(args.grad_ckpt),
+        load_best_model_at_end=False,
     )
 
-    trainer = Trainer(model=model, args=train_args, train_dataset=train_ds, tokenizer=tokenizer)
+    trainer = Trainer(model=model, args=train_args, train_dataset=train_ds, eval_dataset=valid_ds, tokenizer=tokenizer)
     trainer.train()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
