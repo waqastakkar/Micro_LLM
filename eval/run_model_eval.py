@@ -9,17 +9,14 @@ import random
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from eval.decision import generate_decisions
 from eval.prompt_templates import PROMPT_VERSION, build_prompt
-from eval.schemas import (
-    AST_INTERPRETATION_SCHEMA,
-    BLOOD_CULTURE_ASSESSMENT_SCHEMA,
-    STRUCTURED_REPORT_DRAFT_SCHEMA,
-)
+from eval.repair import repair_to_valid_json
+from eval.schemas import SCHEMAS
 from eval.scoring import summarize_results
-from eval.validators import repair_json, validate_citations, validate_json
+from eval.validators import parse_json_strict, safe_failure, validate_citations, validate_schema
 
 try:
     import torch
@@ -29,28 +26,19 @@ except Exception:  # handled gracefully at runtime
     AutoModelForCausalLM = None
     AutoTokenizer = None
 
-
 TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9_]+")
-STRUCTURED_TASK_SCHEMAS = {
-    "ast": AST_INTERPRETATION_SCHEMA,
-    "blood_culture": BLOOD_CULTURE_ASSESSMENT_SCHEMA,
-    "reporting": STRUCTURED_REPORT_DRAFT_SCHEMA,
-}
 
 
 class BM25Retriever:
-    """Minimal lexical BM25 retriever over JSONL chunks."""
-
-    def __init__(self, chunks: List[Dict], text_key: str = "text"):
+    def __init__(self, chunks: list[dict], text_key: str = "text"):
         self.chunks = chunks
         self.text_key = text_key
-        self.doc_tokens: List[List[str]] = []
+        self.doc_tokens: list[list[str]] = []
         self.doc_freq: Counter = Counter()
-        self.doc_len: List[int] = []
+        self.doc_len: list[int] = []
 
         for chunk in chunks:
-            text = str(chunk.get(text_key, ""))
-            toks = self._tokenize(text)
+            toks = self._tokenize(str(chunk.get(text_key, "")))
             self.doc_tokens.append(toks)
             self.doc_len.append(len(toks))
             for token in set(toks):
@@ -62,10 +50,10 @@ class BM25Retriever:
         self.b = 0.75
 
     @staticmethod
-    def _tokenize(text: str) -> List[str]:
+    def _tokenize(text: str) -> list[str]:
         return [t.lower() for t in TOKEN_PATTERN.findall(text)]
 
-    def retrieve(self, query: str, top_k: int = 6) -> List[Dict]:
+    def retrieve(self, query: str, top_k: int = 6) -> list[dict]:
         q_toks = self._tokenize(query)
         if not q_toks or not self.chunks:
             return []
@@ -92,65 +80,25 @@ class BM25Retriever:
         return [self.chunks[i] for _, i in scores[:top_k]]
 
 
-def load_jsonl(path: Path) -> List[Dict]:
-    rows = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-    return rows
+def load_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def load_models(path: Path) -> List[Dict]:
-    try:
-        import yaml  # lazy import so --help works without PyYAML
-    except Exception as exc:
-        raise SystemExit("PyYAML is required to read --models YAML. Install with: pip install pyyaml") from exc
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return data.get("models", [])
+def load_models(path: Path) -> list[dict]:
+    import yaml
+
+    return yaml.safe_load(path.read_text(encoding="utf-8")).get("models", [])
 
 
-def resolve_models(all_models: List[Dict], model_id: str | None) -> List[Dict]:
+def resolve_models(all_models: list[dict], model_id: str | None) -> list[dict]:
     if model_id:
-        selected = [m for m in all_models if m.get("id") == model_id]
-        return selected
+        return [m for m in all_models if m.get("id") == model_id]
     defaults = [m for m in all_models if m.get("default")]
     return defaults or all_models[:1]
 
 
-def resolve_torch_dtype(dtype_name: str):
-    if dtype_name == "fp16":
-        return torch.float16
-    if dtype_name == "bf16":
-        return torch.bfloat16
-    return torch.float32
-
-
-def estimate_vram_usage_gb(model, requested_device: str) -> float | None:
-    if torch is None or not torch.cuda.is_available() or requested_device == "cpu":
-        return None
-
-    footprint_bytes = None
-    if hasattr(model, "get_memory_footprint"):
-        try:
-            footprint_bytes = model.get_memory_footprint()
-        except Exception:
-            footprint_bytes = None
-
-    if footprint_bytes is None:
-        try:
-            footprint_bytes = torch.cuda.memory_allocated()
-        except Exception:
-            return None
-
-    return float(footprint_bytes) / (1024**3)
-
-
-def format_evidence(chunks: List[Dict]) -> Tuple[str, List[str]]:
-    lines = []
-    ids = []
+def format_evidence(chunks: list[dict]) -> tuple[str, list[str]]:
+    lines, ids = [], []
     for i, chunk in enumerate(chunks):
         chunk_id = str(chunk.get("chunk_id") or chunk.get("id") or f"chunk_{i}")
         ids.append(chunk_id)
@@ -158,34 +106,39 @@ def format_evidence(chunks: List[Dict]) -> Tuple[str, List[str]]:
     return "\n".join(lines), ids
 
 
-def generate(model, tokenizer, prompt: Dict[str, str], max_new_tokens: int) -> str:
-    messages = [
-        {"role": "system", "content": prompt["system"]},
-        {"role": "user", "content": prompt["user"]},
-    ]
+def _extract_escalation_and_safety(obj: Any) -> tuple[bool | None, bool]:
+    if isinstance(obj, dict):
+        escalation = obj.get("escalation_flag") if isinstance(obj.get("escalation_flag"), bool) else None
+        safety_notes = obj.get("safety_notes")
+        return escalation, isinstance(safety_notes, list) and len(safety_notes) > 0
+    return None, False
+
+
+def generate(model, tokenizer, prompt: dict[str, str], max_new_tokens: int, seed: int) -> str:
+    messages = [{"role": "system", "content": prompt["system"]}, {"role": "user", "content": prompt["user"]}]
 
     if hasattr(tokenizer, "apply_chat_template"):
-        tokenized = tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=True,
-            return_tensors="pt",
-        )
+        inputs = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True, return_tensors="pt")
     else:
         raw = f"System: {prompt['system']}\n\nUser: {prompt['user']}\nAssistant:"
-        tokenized = tokenizer(raw, return_tensors="pt").input_ids
+        inputs = tokenizer(raw, return_tensors="pt").input_ids
 
-    tokenized = tokenized.to(model.device)
+    inputs = inputs.to(model.device)
+    if torch is not None:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
     with torch.inference_mode():
         output = model.generate(
-            tokenized,
+            inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
             temperature=0.0,
             top_p=1.0,
             pad_token_id=tokenizer.eos_token_id,
         )
-    new_tokens = output[0][tokenized.shape[-1] :]
+    new_tokens = output[0][inputs.shape[-1] :]
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
@@ -200,8 +153,6 @@ def main() -> None:
     parser.add_argument("--model_id", type=str, default=None)
     parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"])
-    parser.add_argument("--dtype", type=str, default="fp16", choices=["fp16", "bf16", "fp32"])
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -210,27 +161,16 @@ def main() -> None:
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(args.seed)
 
-    all_models = load_models(args.models)
-    chosen_models = resolve_models(all_models, args.model_id)
-    if not chosen_models:
-        raise SystemExit("No models selected. Check --model_id and models.yaml.")
-
+    models = resolve_models(load_models(args.models), args.model_id)
     gold = load_jsonl(args.gold)
     chunks = load_jsonl(args.chunks)
     retriever = BM25Retriever(chunks)
-    system_prompt_text = Path("eval/system_prompt.txt").read_text(encoding="utf-8").strip()
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.summary_out.parent.mkdir(parents=True, exist_ok=True)
-
-    results: List[Dict] = []
-
-    for model_cfg in chosen_models:
-        model_id = model_cfg.get("id")
-        print(f"\n=== Evaluating {model_id} ===")
+    results: list[dict] = []
+    for model_cfg in models:
+        model_id = model_cfg["id"]
 
         if AutoTokenizer is None or AutoModelForCausalLM is None:
-            print(f"[WARN] transformers/torch not available. Skipping {model_id}.")
             for item in gold:
                 results.append(
                     {
@@ -242,124 +182,96 @@ def main() -> None:
                         "prompt_version": PROMPT_VERSION,
                         "retrieved_chunk_ids": [],
                         "output": "",
-                        "output_repeat": "",
-                        "validation": {"ok": False, "error": "transformers_or_torch_unavailable"},
-                        "citation_metrics": validate_citations("", []),
+                        "schema_ok": False,
+                        "schema_error": "transformers_or_torch_unavailable",
+                        "citation_count": 0,
+                        "invalid_citations": [],
+                        "has_any_citations": False,
+                        "escalation_flag": None,
+                        "safety_notes_present": False,
                         "error": "transformers_or_torch_unavailable",
                     }
                 )
             continue
 
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id)
-            torch_dtype = resolve_torch_dtype(args.dtype)
-            model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                torch_dtype=torch_dtype,
-                device_map=("cuda" if args.device == "cuda" else "auto" if args.device == "auto" else {"": "cpu"}),
-                low_cpu_mem_usage=True,
-            )
-            model.eval()
-
-            vram_usage_gb = estimate_vram_usage_gb(model, args.device)
-            vram_text = f"{vram_usage_gb:.2f} GB" if vram_usage_gb is not None else "unavailable"
-            print(
-                f"Loaded model_id={model_id} dtype={args.dtype} device={args.device} estimated_vram={vram_text}"
-            )
-        except Exception as exc:
-            print(f"[WARN] Failed to load {model_id}: {exc}")
-            for item in gold:
-                results.append(
-                    {
-                        "model_id": model_id,
-                        "item_id": item["id"],
-                        "task": item.get("task"),
-                        "expected_type": item.get("expected_type"),
-                        "must_refuse": bool(item.get("must_refuse", False)),
-                        "prompt_version": PROMPT_VERSION,
-                        "retrieved_chunk_ids": [],
-                        "output": "",
-                        "output_repeat": "",
-                        "validation": {"ok": False, "error": f"load_failure: {exc}"},
-                        "citation_metrics": validate_citations("", []),
-                        "error": f"load_failure: {exc}",
-                    }
-                )
-            continue
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", low_cpu_mem_usage=True)
+        model.eval()
 
         for item in gold:
+            task = (item.get("task") or "").strip().lower()
+            schema = SCHEMAS.get(task)
+            expected_type = (item.get("expected_type") or "text").lower()
+
             retrieved = retriever.retrieve(item.get("question", ""), top_k=args.top_k)
             evidence_text, chunk_ids = format_evidence(retrieved)
-            prompt = build_prompt(item.get("task", ""), item.get("question", ""), evidence_text)
-            prompt["system"] = f"{system_prompt_text}\n\n{prompt['system']}"
+            prompt = build_prompt(task, item.get("question", ""), evidence_text)
 
-            try:
-                output = generate(model, tokenizer, prompt, max_new_tokens=args.max_new_tokens)
-                output_repeat = generate(model, tokenizer, prompt, max_new_tokens=args.max_new_tokens)
-                error = None
-            except Exception as exc:
-                output = ""
-                output_repeat = ""
-                error = f"generation_failure: {exc}"
+            output = generate(model, tokenizer, prompt, max_new_tokens=args.max_new_tokens, seed=args.seed)
+            record_obj: Any = output
+            schema_ok = expected_type != "json"
+            schema_error = None
 
-            task = (item.get("task") or "").strip().lower()
-            schema = STRUCTURED_TASK_SCHEMAS.get(task)
-            validation: Dict[str, Any]
-            normalized_output = output
-
-            if schema and not error:
-                ok, obj_or_error = validate_json(schema, output)
-                if ok:
-                    validation = {"ok": True, "repaired": False, "error": None}
-                    normalized_output = json.dumps(obj_or_error, ensure_ascii=False)
+            if expected_type == "json" and schema is not None:
+                ok_json, parsed_or_err = parse_json_strict(output)
+                if ok_json:
+                    ok_schema, err = validate_schema(schema, parsed_or_err)
+                    if ok_schema:
+                        record_obj = parsed_or_err
+                        schema_ok = True
+                    else:
+                        repaired = repair_to_valid_json(
+                            task,
+                            schema,
+                            output,
+                            lambda rp: generate(model, tokenizer, {"system": prompt["system"], "user": rp}, args.max_new_tokens, args.seed),
+                            retrieved,
+                        )
+                        ok_schema, err = validate_schema(schema, repaired)
+                        record_obj = repaired
+                        schema_ok = ok_schema
+                        schema_error = None if ok_schema else err
                 else:
-                    repair_obj = repair_json(
+                    repaired = repair_to_valid_json(
+                        task,
                         schema,
                         output,
-                        lambda repair_user_prompt: generate(
-                            model,
-                            tokenizer,
-                            {"system": prompt["system"], "user": repair_user_prompt},
-                            max_new_tokens=args.max_new_tokens,
-                        ),
+                        lambda rp: generate(model, tokenizer, {"system": prompt["system"], "user": rp}, args.max_new_tokens, args.seed),
+                        retrieved,
                     )
-                    validation = {"ok": "safe_failure" not in repair_obj, "repaired": True, "error": None if "safe_failure" not in repair_obj else repair_obj.get("error")}
-                    normalized_output = json.dumps(repair_obj, ensure_ascii=False)
-            elif schema and error:
-                validation = {"ok": False, "repaired": False, "error": error}
-            else:
-                validation = {"ok": True, "repaired": False, "error": None}
+                    ok_schema, err = validate_schema(schema, repaired)
+                    record_obj = repaired if ok_schema else safe_failure(task, str(parsed_or_err), chunk_ids)
+                    schema_ok = ok_schema
+                    schema_error = None if ok_schema else err
 
-            citation_metrics = validate_citations(normalized_output, chunk_ids)
+            citations = validate_citations(record_obj, set(chunk_ids))
+            escalation_flag, safety_notes_present = _extract_escalation_and_safety(record_obj)
 
             results.append(
                 {
                     "model_id": model_id,
                     "item_id": item["id"],
-                    "task": item.get("task"),
-                    "expected_type": item.get("expected_type"),
+                    "task": task,
+                    "expected_type": expected_type,
                     "must_refuse": bool(item.get("must_refuse", False)),
                     "prompt_version": PROMPT_VERSION,
                     "retrieved_chunk_ids": chunk_ids,
-                    "output": normalized_output,
-                    "output_repeat": output_repeat,
-                    "validation": validation,
-                    "citation_metrics": citation_metrics,
-                    "error": error,
+                    "output": json.dumps(record_obj, ensure_ascii=False) if isinstance(record_obj, dict) else str(record_obj),
+                    "schema_ok": bool(schema_ok),
+                    "schema_error": schema_error,
+                    "citation_count": citations["citation_count"],
+                    "invalid_citations": citations["invalid_citations"],
+                    "has_any_citations": citations["has_any_citations"],
+                    "escalation_flag": escalation_flag,
+                    "safety_notes_present": safety_notes_present,
+                    "error": None,
                 }
             )
 
-    with args.out.open("w", encoding="utf-8") as f:
-        for rec in results:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
+    args.out.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in results) + "\n", encoding="utf-8")
     summary = summarize_results(results)
     decisions = generate_decisions(summary)
-    payload = {"summary": summary, "decisions": decisions}
-    args.summary_out.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-
-    for model_id, decision in decisions.items():
-        print(f"- {model_id}: {decision['recommendation']} | {decision['justification']}")
+    args.summary_out.write_text(json.dumps({"summary": summary, "decisions": decisions}, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

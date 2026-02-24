@@ -1,4 +1,4 @@
-"""JSON schemas for structured evaluation tasks."""
+"""JSON schema definitions for constrained clinical microbiology tasks."""
 
 from __future__ import annotations
 
@@ -6,123 +6,117 @@ AST_INTERPRETATION_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": [
+        "task",
         "organism",
-        "antibiotics",
-        "overall_interpretation",
-        "safety_flags",
-        "needs_escalation",
+        "isolate_site",
+        "antibiotic_results",
+        "overall_summary",
+        "confidence",
+        "escalation_flag",
+        "follow_up_questions",
+        "safety_notes",
     ],
     "properties": {
-        "organism": {"type": "string", "minLength": 1},
-        "antibiotics": {
+        "task": {"const": "ast"},
+        "organism": {"type": "string"},
+        "isolate_site": {"type": ["string", "null"]},
+        "antibiotic_results": {
             "type": "array",
-            "minItems": 1,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["name", "interpretation", "evidence"],
+                "required": [
+                    "drug",
+                    "mic_or_zone",
+                    "unit",
+                    "interpretation",
+                    "breakpoint_source",
+                    "breakpoint_notes",
+                    "intrinsic_resistance_alert",
+                    "cascade_reporting_note",
+                    "evidence",
+                ],
                 "properties": {
-                    "name": {"type": "string", "minLength": 1},
-                    "interpretation": {
+                    "drug": {"type": "string"},
+                    "mic_or_zone": {"type": ["string", "null"]},
+                    "unit": {"type": ["string", "null"], "enum": ["mg/L", "ug/mL", "mm", None]},
+                    "interpretation": {"type": "string", "enum": ["S", "I", "R", "SDD", "NA"]},
+                    "breakpoint_source": {
                         "type": "string",
-                        "enum": ["S", "I", "R", "SDD", "unknown"],
+                        "enum": ["CLSI", "EUCAST", "LAB_DEFINED", "UNKNOWN"],
                     },
-                    "evidence": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {"type": "string", "minLength": 1},
-                    },
+                    "breakpoint_notes": {"type": "string"},
+                    "intrinsic_resistance_alert": {"type": "boolean"},
+                    "cascade_reporting_note": {"type": ["string", "null"]},
+                    "evidence": {"type": "array", "items": {"type": "string"}},
                 },
             },
         },
-        "overall_interpretation": {"type": "string", "minLength": 1},
-        "safety_flags": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "enum": [
-                    "none",
-                    "insufficient_evidence",
-                    "discordant_evidence",
-                    "critical_result",
-                    "requires_id_consult",
-                ],
-            },
-            "minItems": 1,
-        },
-        "needs_escalation": {"type": "boolean"},
+        "overall_summary": {"type": "string"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "escalation_flag": {"type": "boolean"},
+        "follow_up_questions": {"type": "array", "items": {"type": "string"}},
+        "safety_notes": {"type": "array", "items": {"type": "string"}},
     },
 }
 
-BLOOD_CULTURE_ASSESSMENT_SCHEMA = {
+BLOOD_CULTURE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["classification", "rationale", "confidence", "safety_flags", "needs_escalation"],
+    "required": [
+        "task",
+        "likely_contaminant",
+        "rationale",
+        "organism",
+        "supporting_evidence",
+        "recommended_next_steps",
+        "confidence",
+        "escalation_flag",
+        "follow_up_questions",
+        "safety_notes",
+    ],
     "properties": {
-        "classification": {
+        "task": {"const": "blood_culture"},
+        "likely_contaminant": {"anyOf": [{"type": "boolean"}, {"const": "uncertain"}]},
+        "rationale": {"type": "string"},
+        "organism": {"type": ["string", "null"]},
+        "supporting_evidence": {"type": "array", "items": {"type": "string"}},
+        "recommended_next_steps": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "escalation_flag": {"type": "boolean"},
+        "follow_up_questions": {"type": "array", "items": {"type": "string"}},
+        "safety_notes": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+STRUCTURED_REPORT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "task",
+        "report_type",
+        "draft_report",
+        "critical_value_message_template",
+        "supporting_evidence",
+        "escalation_flag",
+        "safety_notes",
+    ],
+    "properties": {
+        "task": {"const": "reporting"},
+        "report_type": {
             "type": "string",
-            "enum": ["contaminant", "true_pathogen", "indeterminate", "insufficient_evidence"],
+            "enum": ["routine", "critical_value", "sterile_site", "blood_culture"],
         },
-        "rationale": {
-            "type": "array",
-            "minItems": 1,
-            "items": {"type": "string", "minLength": 1},
-        },
-        "confidence": {"type": "string", "enum": ["low", "moderate", "high"]},
-        "safety_flags": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "enum": [
-                    "none",
-                    "insufficient_evidence",
-                    "discordant_evidence",
-                    "possible_sepsis",
-                    "requires_urgent_review",
-                ],
-            },
-            "minItems": 1,
-        },
-        "needs_escalation": {"type": "boolean"},
-    },
-}
-
-STRUCTURED_REPORT_DRAFT_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["report_type", "summary", "key_findings", "safety_flags", "needs_escalation"],
-    "properties": {
-        "report_type": {"type": "string", "enum": ["preliminary", "final", "corrected"]},
-        "summary": {"type": "string", "minLength": 1},
-        "key_findings": {
-            "type": "array",
-            "minItems": 1,
-            "items": {"type": "string", "minLength": 1},
-        },
-        "recommended_follow_up_fields": {
-            "type": "array",
-            "items": {"type": "string", "minLength": 1},
-        },
-        "safety_flags": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "enum": [
-                    "none",
-                    "insufficient_evidence",
-                    "discordant_evidence",
-                    "critical_result",
-                    "requires_correction_notice",
-                ],
-            },
-            "minItems": 1,
-        },
-        "needs_escalation": {"type": "boolean"},
+        "draft_report": {"type": "string"},
+        "critical_value_message_template": {"type": ["string", "null"]},
+        "supporting_evidence": {"type": "array", "items": {"type": "string"}},
+        "escalation_flag": {"type": "boolean"},
+        "safety_notes": {"type": "array", "items": {"type": "string"}},
     },
 }
 
 SCHEMAS = {
-    "ast_interpretation": AST_INTERPRETATION_SCHEMA,
-    "blood_culture_assessment": BLOOD_CULTURE_ASSESSMENT_SCHEMA,
-    "structured_report_draft": STRUCTURED_REPORT_DRAFT_SCHEMA,
+    "ast": AST_INTERPRETATION_SCHEMA,
+    "blood_culture": BLOOD_CULTURE_SCHEMA,
+    "reporting": STRUCTURED_REPORT_SCHEMA,
 }
