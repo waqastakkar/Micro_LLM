@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect x="0" y="0" width="1600" height="900" fill="white"/>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#111"/>
+    </marker>
+    <style>
+      .t{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:700;fill:#111;font-size:22px}
+      .title{font-size:34px}
+      .box{fill:#f7f7f7;stroke:#111;stroke-width:2}
+      .accent{fill:#eceff7;stroke:#111;stroke-width:2}
+      .line{stroke:#111;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <text x="40" y="60" class="t title">FIGURE 1 — SYSTEM ARCHITECTURE</text>
+
+  <rect class="box" x="60" y="130" rx="18" ry="18" width="180" height="90"/>
+  <text class="t" x="150" y="185" text-anchor="middle">PMC OA</text>
+
+  <rect class="box" x="280" y="130" rx="18" ry="18" width="200" height="90"/>
+  <text class="t" x="380" y="185" text-anchor="middle">XML PARSER</text>
+
+  <rect class="box" x="520" y="130" rx="18" ry="18" width="220" height="90"/>
+  <text class="t" x="630" y="185" text-anchor="middle">CLEAN JSONL</text>
+
+  <rect class="box" x="780" y="130" rx="18" ry="18" width="260" height="90"/>
+  <text class="t" x="910" y="185" text-anchor="middle">CHUNK + WEAK LABELS</text>
+
+  <rect class="box" x="1080" y="130" rx="18" ry="18" width="220" height="90"/>
+  <text class="t" x="1190" y="185" text-anchor="middle">RAG CHUNKS</text>
+
+  <path class="line" d="M240 175 L280 175"/>
+  <path class="line" d="M480 175 L520 175"/>
+  <path class="line" d="M740 175 L780 175"/>
+  <path class="line" d="M1040 175 L1080 175"/>
+
+  <rect class="accent" x="140" y="360" rx="18" ry="18" width="280" height="110"/>
+  <text class="t" x="280" y="420" text-anchor="middle">RETRIEVER (TOP-K EVIDENCE)</text>
+
+  <rect class="accent" x="480" y="360" rx="18" ry="18" width="320" height="110"/>
+  <text class="t" x="640" y="420" text-anchor="middle">EVIDENCE-FIRST PROMPT</text>
+
+  <rect class="accent" x="860" y="360" rx="18" ry="18" width="240" height="110"/>
+  <text class="t" x="980" y="420" text-anchor="middle">BIOMISTRAL</text>
+
+  <rect class="accent" x="1160" y="360" rx="18" ry="18" width="240" height="110"/>
+  <text class="t" x="1280" y="410" text-anchor="middle">VALIDATORS</text>
+  <text class="t" x="1280" y="440" text-anchor="middle">/ GATES</text>
+
+  <rect class="box" x="1200" y="610" rx="18" ry="18" width="290" height="110"/>
+  <text class="t" x="1345" y="670" text-anchor="middle">FINAL OUTPUT (JSON/REPORT)</text>
+
+  <path class="line" d="M1300 220 L280 360"/>
+  <path class="line" d="M420 415 L480 415"/>
+  <path class="line" d="M800 415 L860 415"/>
+  <path class="line" d="M1100 415 L1160 415"/>
+  <path class="line" d="M1280 470 L1345 610"/>
+
+  <rect class="box" x="70" y="600" rx="14" ry="14" width="420" height="70"/>
+  <text class="t" x="280" y="644" text-anchor="middle">TRACEABLE CHUNK_ID CITATIONS</text>
+
+  <rect class="box" x="70" y="690" rx="14" ry="14" width="420" height="70"/>
+  <text class="t" x="280" y="734" text-anchor="middle">NON-PRESCRIBING</text>
+
+  <rect class="box" x="70" y="780" rx="14" ry="14" width="640" height="70"/>
+  <text class="t" x="390" y="824" text-anchor="middle">ESCALATION ON INSUFFICIENT EVIDENCE</text>
+</svg>

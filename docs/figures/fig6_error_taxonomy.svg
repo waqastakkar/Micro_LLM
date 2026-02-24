@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="white"/>
+  <defs>
+    <style>
+      .t{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:700;fill:#111;font-size:22px}
+      .title{font-size:34px}
+      .axis{stroke:#111;stroke-width:3}
+      .c1{fill:#d9d9d9;stroke:#111;stroke-width:1.5}
+      .c2{fill:#c8c8c8;stroke:#111;stroke-width:1.5}
+      .c3{fill:#b8b8b8;stroke:#111;stroke-width:1.5}
+      .c4{fill:#aab7d1;stroke:#111;stroke-width:1.5}
+      .c5{fill:#9f9f9f;stroke:#111;stroke-width:1.5}
+    </style>
+  </defs>
+
+  <text x="40" y="60" class="t title">FIGURE 6 — ERROR TAXONOMY TEMPLATE (STACKED BY TASK)</text>
+  <line x1="160" y1="780" x2="1300" y2="780" class="axis"/>
+  <line x1="160" y1="160" x2="160" y2="780" class="axis"/>
+
+  <g transform="translate(240,0)">
+    <rect class="c1" x="0" y="690" width="90" height="90"/>
+    <rect class="c2" x="0" y="620" width="90" height="70"/>
+    <rect class="c3" x="0" y="560" width="90" height="60"/>
+    <rect class="c4" x="0" y="500" width="90" height="60"/>
+    <rect class="c5" x="0" y="450" width="90" height="50"/>
+    <text class="t" x="45" y="830" text-anchor="middle">AST</text>
+  </g>
+
+  <g transform="translate(410,0)">
+    <rect class="c1" x="0" y="700" width="90" height="80"/>
+    <rect class="c2" x="0" y="640" width="90" height="60"/>
+    <rect class="c3" x="0" y="570" width="90" height="70"/>
+    <rect class="c4" x="0" y="510" width="90" height="60"/>
+    <rect class="c5" x="0" y="470" width="90" height="40"/>
+    <text class="t" x="45" y="830" text-anchor="middle">BLOOD CULTURE</text>
+  </g>
+
+  <g transform="translate(580,0)">
+    <rect class="c1" x="0" y="710" width="90" height="70"/>
+    <rect class="c2" x="0" y="650" width="90" height="60"/>
+    <rect class="c3" x="0" y="590" width="90" height="60"/>
+    <rect class="c4" x="0" y="530" width="90" height="60"/>
+    <rect class="c5" x="0" y="500" width="90" height="30"/>
+    <text class="t" x="45" y="830" text-anchor="middle">REPORTING</text>
+  </g>
+
+  <g transform="translate(750,0)">
+    <rect class="c1" x="0" y="705" width="90" height="75"/>
+    <rect class="c2" x="0" y="645" width="90" height="60"/>
+    <rect class="c3" x="0" y="585" width="90" height="60"/>
+    <rect class="c4" x="0" y="520" width="90" height="65"/>
+    <rect class="c5" x="0" y="485" width="90" height="35"/>
+    <text class="t" x="45" y="830" text-anchor="middle">RAPID DX</text>
+  </g>
+
+  <g transform="translate(920,0)">
+    <rect class="c1" x="0" y="695" width="90" height="85"/>
+    <rect class="c2" x="0" y="630" width="90" height="65"/>
+    <rect class="c3" x="0" y="570" width="90" height="60"/>
+    <rect class="c4" x="0" y="515" width="90" height="55"/>
+    <rect class="c5" x="0" y="470" width="90" height="45"/>
+    <text class="t" x="45" y="830" text-anchor="middle">ORGANISM ID</text>
+  </g>
+
+  <g transform="translate(1090,0)">
+    <rect class="c1" x="0" y="715" width="90" height="65"/>
+    <rect class="c2" x="0" y="655" width="90" height="60"/>
+    <rect class="c3" x="0" y="600" width="90" height="55"/>
+    <rect class="c4" x="0" y="535" width="90" height="65"/>
+    <rect class="c5" x="0" y="500" width="90" height="35"/>
+    <text class="t" x="45" y="830" text-anchor="middle">STEWARDSHIP</text>
+  </g>
+
+  <rect class="c1" x="1340" y="240" width="34" height="22"/><text class="t" x="1385" y="258">schema_invalid</text>
+  <rect class="c2" x="1340" y="280" width="34" height="22"/><text class="t" x="1385" y="298">invalid_citations</text>
+  <rect class="c3" x="1340" y="320" width="34" height="22"/><text class="t" x="1385" y="338">no_citations</text>
+  <rect class="c4" x="1340" y="360" width="34" height="22"/><text class="t" x="1385" y="378">non_prescribing</text>
+  <rect class="c5" x="1340" y="400" width="34" height="22"/><text class="t" x="1385" y="418">must_refuse_failed</text>
+</svg>
