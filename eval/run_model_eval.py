@@ -203,7 +203,7 @@ def generate(model, tokenizer, prompt: dict[str, str], max_new_tokens: int, seed
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Track A model shortlist evaluation.")
     parser.add_argument("--models", type=Path, required=True)
-    parser.add_argument("--gold", type=Path, required=True)
+    parser.add_argument("--gold", type=Path, default=Path("eval/gold.jsonl"))
     parser.add_argument("--chunks", type=Path, required=True)
     parser.add_argument("--top_k", type=int, default=6)
     parser.add_argument("--out", type=Path, required=True)
@@ -212,6 +212,9 @@ def main() -> None:
     parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
+
+    if not args.gold.exists():
+        parser.exit(2, f"Missing gold file: {args.gold}. Run `python -m eval.generate_gold --chunks rag/rag_chunks.jsonl --out eval/gold.jsonl --n_total 200 --seed 42` first.\n")
 
     random.seed(args.seed)
     if torch is not None:
