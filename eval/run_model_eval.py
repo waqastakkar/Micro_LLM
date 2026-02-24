@@ -120,12 +120,32 @@ def resolve_models(all_models: List[Dict], model_id: str | None) -> List[Dict]:
     return defaults or all_models[:1]
 
 
-def get_device(name: str) -> str:
-    if name in {"cpu", "cuda"}:
-        return name
-    if torch is not None and torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
+def resolve_torch_dtype(dtype_name: str):
+    if dtype_name == "fp16":
+        return torch.float16
+    if dtype_name == "bf16":
+        return torch.bfloat16
+    return torch.float32
+
+
+def estimate_vram_usage_gb(model, requested_device: str) -> float | None:
+    if torch is None or not torch.cuda.is_available() or requested_device == "cpu":
+        return None
+
+    footprint_bytes = None
+    if hasattr(model, "get_memory_footprint"):
+        try:
+            footprint_bytes = model.get_memory_footprint()
+        except Exception:
+            footprint_bytes = None
+
+    if footprint_bytes is None:
+        try:
+            footprint_bytes = torch.cuda.memory_allocated()
+        except Exception:
+            return None
+
+    return float(footprint_bytes) / (1024**3)
 
 
 def format_evidence(chunks: List[Dict]) -> Tuple[str, List[str]]:
@@ -156,13 +176,15 @@ def generate(model, tokenizer, prompt: Dict[str, str], max_new_tokens: int) -> s
         tokenized = tokenizer(raw, return_tensors="pt").input_ids
 
     tokenized = tokenized.to(model.device)
-    output = model.generate(
-        tokenized,
-        max_new_tokens=max_new_tokens,
-        do_sample=False,
-        temperature=0.0,
-        pad_token_id=tokenizer.eos_token_id,
-    )
+    with torch.inference_mode():
+        output = model.generate(
+            tokenized,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            temperature=0.0,
+            top_p=1.0,
+            pad_token_id=tokenizer.eos_token_id,
+        )
     new_tokens = output[0][tokenized.shape[-1] :]
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
@@ -176,9 +198,10 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--summary_out", type=Path, default=Path("eval/summary.json"))
     parser.add_argument("--model_id", type=str, default=None)
-    parser.add_argument("--max_new_tokens", type=int, default=320)
+    parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"])
+    parser.add_argument("--dtype", type=str, default="fp16", choices=["fp16", "bf16", "fp32"])
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -201,11 +224,10 @@ def main() -> None:
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)
 
     results: List[Dict] = []
-    device = get_device(args.device)
 
     for model_cfg in chosen_models:
         model_id = model_cfg.get("id")
-        print(f"\n=== Evaluating {model_id} on device={device} ===")
+        print(f"\n=== Evaluating {model_id} ===")
 
         if AutoTokenizer is None or AutoModelForCausalLM is None:
             print(f"[WARN] transformers/torch not available. Skipping {model_id}.")
@@ -230,9 +252,20 @@ def main() -> None:
 
         try:
             tokenizer = AutoTokenizer.from_pretrained(model_id)
-            model = AutoModelForCausalLM.from_pretrained(model_id)
-            model.to(device)
+            torch_dtype = resolve_torch_dtype(args.dtype)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                torch_dtype=torch_dtype,
+                device_map=("cuda" if args.device == "cuda" else "auto" if args.device == "auto" else {"": "cpu"}),
+                low_cpu_mem_usage=True,
+            )
             model.eval()
+
+            vram_usage_gb = estimate_vram_usage_gb(model, args.device)
+            vram_text = f"{vram_usage_gb:.2f} GB" if vram_usage_gb is not None else "unavailable"
+            print(
+                f"Loaded model_id={model_id} dtype={args.dtype} device={args.device} estimated_vram={vram_text}"
+            )
         except Exception as exc:
             print(f"[WARN] Failed to load {model_id}: {exc}")
             for item in gold:
