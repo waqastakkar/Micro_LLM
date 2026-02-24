@@ -47,3 +47,9 @@ Metrics include:
 - **preference tuning (DPO/ORPO) recommended**: failures are mostly uncited claims, refusal errors, or unsafe behavior.
 
 If a model cannot be loaded, the run continues and records `error` fields for that model instead of crashing.
+
+Step 5 safety behavior:
+
+- Automatic safety gates block non-prescribing violations (dose/regimen language).
+- Automatic citation gates enforce valid evidence references and minimum citation/evidence count.
+- Gates may convert otherwise answer-like output into escalation/safe-failure responses for clinical safety.

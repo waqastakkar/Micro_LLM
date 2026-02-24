@@ -16,7 +16,16 @@ from eval.prompt_templates import PROMPT_VERSION, build_prompt
 from eval.repair import repair_to_valid_json
 from eval.schemas import SCHEMAS
 from eval.scoring import summarize_results
-from eval.validators import parse_json_strict, safe_failure, validate_citations, validate_schema
+from eval.validators import (
+    detect_prescribing_language,
+    enforce_citation_gate_json,
+    enforce_citation_gate_text,
+    make_escalation_override,
+    parse_json_strict,
+    safe_failure,
+    validate_citations,
+    validate_schema,
+)
 
 try:
     import torch
@@ -114,6 +123,55 @@ def _extract_escalation_and_safety(obj: Any) -> tuple[bool | None, bool]:
     return None, False
 
 
+def _collect_json_text_fields(obj: Any, parent: str | None = None) -> list[str]:
+    texts: list[str] = []
+    free_text_keys = {
+        "overall_summary",
+        "rationale",
+        "draft_report",
+        "safety_notes",
+        "breakpoint_notes",
+        "recommended_next_steps",
+        "follow_up_questions",
+        "critical_value_message_template",
+        "cascade_reporting_note",
+    }
+    if isinstance(obj, str):
+        if parent in free_text_keys:
+            texts.append(obj)
+    elif isinstance(obj, list):
+        for item in obj:
+            texts.extend(_collect_json_text_fields(item, parent=parent))
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            texts.extend(_collect_json_text_fields(v, parent=k))
+    return texts
+
+
+def _safe_text_refusal(reason: str) -> str:
+    return (
+        "I can’t provide prescribing instructions. I can summarize evidence and suggest clinician review. "
+        "INSUFFICIENT EVIDENCE. Escalate to stewardship/ID.\n"
+        "Follow-up questions:\n"
+        "1) What organism/source and diagnostic timeline are available?\n"
+        "2) What patient-specific risks/allergies/renal-hepatic factors apply?\n"
+        "3) Which evidence chunks should be added to support a safe summary?\n"
+        f"4) Safety gate reason: {reason}"
+    )
+
+
+def _safe_text_citation_fail(reason: str) -> str:
+    return (
+        "INSUFFICIENT EVIDENCE. I can’t answer reliably without evidence-cited sources. "
+        "Please provide missing details or expand retrieval.\n"
+        "Follow-up questions:\n"
+        "1) Can you provide additional retrieved chunks relevant to the question?\n"
+        "2) Are there specific lab findings/timepoints to ground the answer?\n"
+        "3) Should this be escalated for clinician review now?\n"
+        f"4) Citation gate reason: {reason}"
+    )
+
+
 def generate(model, tokenizer, prompt: dict[str, str], max_new_tokens: int, seed: int) -> str:
     messages = [{"role": "system", "content": prompt["system"]}, {"role": "user", "content": prompt["user"]}]
 
@@ -189,6 +247,12 @@ def main() -> None:
                         "has_any_citations": False,
                         "escalation_flag": None,
                         "safety_notes_present": False,
+                        "safety_gate_triggered": False,
+                        "safety_gate_type": "none",
+                        "safety_gate_reason": None,
+                        "prescribing_matches": [],
+                        "citation_gate_pass": False,
+                        "citation_gate_reason": "model_unavailable",
                         "error": "transformers_or_torch_unavailable",
                     }
                 )
@@ -205,12 +269,17 @@ def main() -> None:
 
             retrieved = retriever.retrieve(item.get("question", ""), top_k=args.top_k)
             evidence_text, chunk_ids = format_evidence(retrieved)
+            chunk_id_set = set(chunk_ids)
             prompt = build_prompt(task, item.get("question", ""), evidence_text)
 
             output = generate(model, tokenizer, prompt, max_new_tokens=args.max_new_tokens, seed=args.seed)
             record_obj: Any = output
             schema_ok = expected_type != "json"
             schema_error = None
+            safety_gate_triggered = False
+            safety_gate_type = "none"
+            safety_gate_reason = None
+            prescribing_matches: list[str] = []
 
             if expected_type == "json" and schema is not None:
                 ok_json, parsed_or_err = parse_json_strict(output)
@@ -244,7 +313,42 @@ def main() -> None:
                     schema_ok = ok_schema
                     schema_error = None if ok_schema else err
 
-            citations = validate_citations(record_obj, set(chunk_ids))
+                text_to_scan = "\n".join(_collect_json_text_fields(record_obj)) if isinstance(record_obj, dict) else ""
+                prescribing = detect_prescribing_language(text_to_scan)
+                prescribing_matches = prescribing["matches"]
+                if prescribing["flagged"]:
+                    safety_gate_triggered = True
+                    safety_gate_type = "non_prescribing"
+                    safety_gate_reason = f"Possible prescribing language detected: {', '.join(prescribing_matches)}"
+                    record_obj = make_escalation_override(task, safety_gate_reason, chunk_ids)
+
+                citation_gate = enforce_citation_gate_json(record_obj, chunk_id_set)
+                if not citation_gate["pass"]:
+                    safety_gate_triggered = True
+                    safety_gate_type = "citation_gate"
+                    safety_gate_reason = f"Insufficient or invalid evidence citations: {citation_gate['reason']}"
+                    record_obj = make_escalation_override(task, safety_gate_reason, chunk_ids)
+
+                schema_ok, schema_error = validate_schema(schema, record_obj)
+                citation_gate_final = enforce_citation_gate_json(record_obj, chunk_id_set)
+            else:
+                prescribing = detect_prescribing_language(output)
+                prescribing_matches = prescribing["matches"]
+                if prescribing["flagged"]:
+                    safety_gate_triggered = True
+                    safety_gate_type = "non_prescribing"
+                    safety_gate_reason = f"Possible prescribing language detected: {', '.join(prescribing_matches)}"
+                    record_obj = _safe_text_refusal(safety_gate_reason)
+
+                citation_gate = enforce_citation_gate_text(str(record_obj), chunk_id_set)
+                if not citation_gate["pass"]:
+                    safety_gate_triggered = True
+                    safety_gate_type = "citation_gate"
+                    safety_gate_reason = citation_gate["reason"]
+                    record_obj = _safe_text_citation_fail(citation_gate["reason"])
+                citation_gate_final = enforce_citation_gate_text(str(record_obj), chunk_id_set)
+
+            citations = validate_citations(record_obj, chunk_id_set)
             escalation_flag, safety_notes_present = _extract_escalation_and_safety(record_obj)
 
             results.append(
@@ -264,6 +368,12 @@ def main() -> None:
                     "has_any_citations": citations["has_any_citations"],
                     "escalation_flag": escalation_flag,
                     "safety_notes_present": safety_notes_present,
+                    "safety_gate_triggered": safety_gate_triggered,
+                    "safety_gate_type": safety_gate_type,
+                    "safety_gate_reason": safety_gate_reason,
+                    "prescribing_matches": prescribing_matches,
+                    "citation_gate_pass": bool(citation_gate_final["pass"]),
+                    "citation_gate_reason": citation_gate_final["reason"],
                     "error": None,
                 }
             )
